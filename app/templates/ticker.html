@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block content %}
+            <!-- Main Content Start -->
+            <div class="container-fluid pt-4 px-4">
+                <div class="bg-secondary text-center rounded p-4">
+                    <div class="d-flex align-items-center justify-content-between mb-4">
+                        <h6 class="mb-0">All Tickers ({{ ticker_list|length }})</h6>
+                        <span class="small">NSE &amp; BSE listed companies, plus S&amp;P 500 and NASDAQ-100</span>
+                    </div>
+                    <input type="search" id="ticker-filter" class="form-control bg-dark mb-3" placeholder="Search by symbol or company name">
+                    <div class="table-responsive">
+                        <table class="table text-start align-middle table-bordered table-hover mb-0">
+                            <thead>
+                                <tr class="text-white">
+                                    <th scope="col">Ticker Symbol</th>
+                                    <th scope="col">Ticker Name</th>
+                                    <th scope="col">Exchange</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ticker-rows">
+                                {% for i in ticker_list %}
+                                <tr>
+                                    <td><a href="/company/{{i.Symbol|urlencode}}/">{{i.Listed}}</a></td>
+                                    <td>{{i.Name}}</td>
+                                    <td>{{i.Exchange}}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <script>
+                document.getElementById('ticker-filter').addEventListener('input', function () {
+                    var q = this.value.trim().toLowerCase();
+                    document.querySelectorAll('#ticker-rows tr').forEach(function (row) {
+                        row.style.display = row.textContent.toLowerCase().indexOf(q) === -1 ? 'none' : '';
+                    });
+                });
+            </script>
+
+            <!-- Main Content Ends -->
+{% endblock %}

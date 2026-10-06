@@ -1,0 +1,29 @@
+{% if unavailable %}
+<p class="small mb-0">Peer comparison covers NIFTY 500 and S&amp;P 500 companies, grouped by industry.</p>
+{% elif busy %}
+<p class="small mb-0">Yahoo Finance is limiting requests right now. Reload the page in a minute to see peers.</p>
+{% else %}
+<p class="small mb-3">{{ industry }} &middot; prices in {{ currency }}</p>
+<div class="table-responsive">
+    <table class="table align-middle table-bordered table-hover mb-0 fin-table">
+        <thead>
+            <tr>
+                <th scope="col">Company</th><th scope="col">CMP</th><th scope="col">P/E</th><th scope="col">Market Cap</th>
+                <th scope="col">Div Yld %</th><th scope="col">P/B</th><th scope="col">1 Yr Return</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in rows %}
+            <tr{% if r.self %} class="strong"{% endif %}>
+                <td><a href="/company/{{ r.symbol|urlencode }}/">{{ r.name }}</a></td>
+                {% for c in r.cells %}{% if forloop.last %}<td class="{{ c.1 }}">{{ c.0 }}</td>{% else %}<td>{{ c }}</td>{% endif %}{% endfor %}
+            </tr>
+            {% endfor %}
+            <tr class="strong">
+                <td>Median: {{ count }} Co.</td>
+                {% for c in median %}{% if forloop.last %}<td class="{{ c.1 }}">{{ c.0 }}</td>{% else %}<td>{{ c }}</td>{% endif %}{% endfor %}
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endif %}

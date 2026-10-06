@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+
+{% block content %}
+            <div class="container-fluid px-4 auth-page">
+                <div class="auth-card">
+                    <h3 class="mb-1">Create your free account</h3>
+                    <p class="mb-4">Forecasts and company analysis for NSE, BSE and US stocks.</p>
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        {% include 'registration/auth_form.html' %}
+                        <button type="submit" class="btn btn-primary w-100 py-2">Create account</button>
+                    </form>
+                    <p class="mt-4 mb-0 text-center">Already have an account? <a href="{% url 'login' %}">Log in</a></p>
+                </div>
+            </div>
+{% endblock %}

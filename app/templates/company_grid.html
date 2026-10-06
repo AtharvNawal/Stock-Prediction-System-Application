@@ -1,0 +1,22 @@
+{% if table %}
+<div class="table-responsive">
+    <table class="table align-middle table-bordered table-hover mb-0 fin-table">
+        <thead>
+            <tr>
+                <th scope="col"></th>
+                {% for h in table.headers %}<th scope="col">{{ h }}</th>{% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in table.rows %}
+            <tr{% if r.strong %} class="strong"{% endif %}>
+                <td>{{ r.label }}</td>
+                {% for c in r.cells %}<td>{{ c }}</td>{% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="mb-0">Not available for this company.</p>
+{% endif %}

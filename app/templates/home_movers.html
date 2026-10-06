@@ -1,0 +1,21 @@
+                    <div class="col-lg-4">
+                        <div class="bg-secondary rounded p-4 h-100">
+                            <h6 class="mb-3">{{ title }}</h6>
+                            <div class="table-responsive">
+                                <table class="table align-middle table-hover mb-0 movers">
+                                    <thead>
+                                        <tr><th scope="col">Company</th><th scope="col">Price</th><th scope="col">{{ heading }}</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for r in rows %}
+                                        <tr>
+                                            <td><a href="/company/{{ r.symbol|urlencode }}/" title="{{ r.name }}">{{ r.listed }}</a></td>
+                                            <td>{{ r.price }}</td>
+                                            <td class="{{ r.value.1 }}">{{ r.value.0 }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>

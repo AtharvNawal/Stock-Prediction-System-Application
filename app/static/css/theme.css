@@ -1,0 +1,397 @@
+/********** Light theme **********
+ * Light grey page, white cards, charcoal text and a purple brand colour.
+ * Green/red are reserved for price movement and always come with ▲/▼.
+ * Text colours meet WCAG AA (4.5:1) on both the page and the cards; the
+ * brighter green/red are kept for non-text marks (chart lines, candles).
+ */
+:root {
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --surface-raised: #f9fafb;
+    --text: #1f2937;           /* 13.5:1 */
+    --text-secondary: #4b5563; /* 6.9:1 */
+    --border: #e5e7eb;
+    --brand: #9b30ff;          /* logo, active items, buttons (white text 4.9:1) */
+    --brand-soft: #f3e8ff;     /* active menu background */
+    --accent: #4f46e5;         /* links and button hover, 5.8:1 */
+    --up: #059669;
+    --up-text: #047857;        /* 5.0:1 */
+    --down: #dc2626;
+    --down-text: #b91c1c;      /* 5.9:1 */
+
+    /* variables used by style.css */
+    --primary: var(--brand);
+    --secondary: var(--surface);
+    --light: var(--text-secondary);
+    --dark: var(--bg);
+}
+
+body {
+    color: var(--text-secondary);
+    background-color: var(--bg);
+}
+
+h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6, .text-white {
+    color: var(--text) !important;
+}
+
+a {
+    color: var(--accent);
+}
+
+a:hover {
+    color: var(--brand);
+}
+
+.text-primary {
+    color: var(--brand) !important;
+}
+
+.bg-secondary {
+    background-color: var(--surface) !important;
+    border: 1px solid var(--border);
+}
+
+.bg-dark {
+    background-color: var(--surface) !important;
+}
+
+#spinner.bg-dark {
+    background-color: var(--bg) !important;
+}
+
+/*** Buttons ***/
+.btn-primary,
+.btn-primary:focus {
+    color: #fff;
+    background-color: var(--brand);
+    border-color: var(--brand);
+    font-weight: 600;
+}
+
+.btn-primary:hover,
+.btn-primary:active {
+    color: #fff;
+    background-color: var(--accent);
+    border-color: var(--accent);
+}
+
+.btn-outline-primary {
+    color: var(--brand);
+    border-color: var(--brand);
+}
+
+.btn-outline-primary:hover,
+.btn-check:checked + .btn-outline-primary,
+.btn-outline-primary.active {
+    color: #fff;
+    background-color: var(--brand);
+    border-color: var(--brand);
+}
+
+.btn:focus-visible,
+.form-control:focus,
+.form-select:focus {
+    box-shadow: 0 0 0 .2rem rgba(155, 48, 255, .25);
+    border-color: var(--brand);
+}
+
+/*** Forms ***/
+.form-control,
+.form-control:focus,
+.form-select {
+    color: var(--text);
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+}
+
+.form-control::placeholder {
+    color: var(--text-secondary);
+}
+
+.form-floating > label {
+    color: var(--text-secondary);
+}
+
+/*** Tables ***/
+.table {
+    color: var(--text-secondary);
+    border-color: var(--border);
+}
+
+.table > :not(caption) > * > * {
+    background-color: transparent;
+    border-color: var(--border);
+}
+
+.table thead th {
+    color: var(--text);
+    background-color: var(--surface-raised);
+}
+
+.table-hover > tbody > tr:hover > * {
+    color: var(--text);
+    background-color: var(--brand-soft);
+}
+
+/*** Seamless layout: the header and page share one soft background ***/
+body {
+    background: linear-gradient(180deg, #eceef4 0%, #f4f5f7 420px, #f4f5f7 100%);
+    background-attachment: fixed;
+}
+
+.content {
+    width: 100%;
+    margin-left: 0;
+    background: transparent;
+}
+
+.bg-secondary {
+    border-color: #e9ebf0;
+}
+
+/* Wordmark: "Stocks" with three rising bars */
+.brand-mark {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 1.6rem;
+    letter-spacing: -.5px;
+    color: var(--text);
+    display: inline-flex;
+    align-items: flex-end;
+    line-height: 1;
+}
+
+.brand-mark .bars {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: .7em;
+    margin-left: 4px;
+}
+
+.brand-mark .bars span {
+    width: 5px;
+    border-radius: 2px;
+    background: var(--brand);
+}
+
+.brand-mark .bars span:nth-child(1) { height: 40%; opacity: .55; }
+.brand-mark .bars span:nth-child(2) { height: 70%; opacity: .8; }
+.brand-mark .bars span:nth-child(3) { height: 100%; }
+
+/*** Header ***/
+.site-header {
+    background: transparent;
+}
+
+.content .site-header .navbar-nav .nav-link {
+    margin: 0 .6rem;
+    padding: .5rem .25rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: .92rem;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+}
+
+.content .site-header .navbar-nav .nav-link:hover {
+    color: var(--text);
+}
+
+.content .site-header .navbar-nav .nav-link.active {
+    color: var(--text);
+    border-bottom-color: var(--brand);
+}
+
+.btn-header {
+    background: var(--surface);
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: .45rem 1rem;
+    color: var(--text);
+    font-size: .85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+}
+
+.btn-header:hover {
+    border-color: var(--text-secondary);
+    color: var(--text);
+}
+
+.btn-header-accent {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.btn-header-accent:hover {
+    color: #fff;
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.account-name {
+    color: var(--text);
+    font-weight: 500;
+    margin-right: .25rem;
+}
+
+.site-header .navbar-toggler {
+    border-color: #d1d5db;
+}
+
+@media (max-width: 991.98px) {
+    .site-header .navbar-nav {
+        padding: .75rem 0;
+    }
+
+    .content .site-header .navbar-nav .nav-link {
+        margin: 0;
+    }
+
+    .account-actions {
+        padding-bottom: .75rem;
+    }
+}
+
+/*** Footer: full-width white band ***/
+.site-footer {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+}
+
+/* space between page content and the footer */
+.footer-gap {
+    height: 3rem;
+    flex-shrink: 0;
+}
+
+.site-footer h6 {
+    font-size: 1rem;
+    margin-bottom: .75rem;
+}
+
+.site-footer a {
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+
+.site-footer .col-6 a {
+    display: block;
+    margin-bottom: .5rem;
+}
+
+.site-footer a:hover {
+    color: var(--brand);
+}
+
+.site-footer .footer-bottom {
+    border-top: 1px solid var(--border);
+    font-size: .9rem;
+}
+
+/*** Login / sign-up ***/
+.auth-page {
+    display: flex;
+    justify-content: center;
+    padding-top: 4vh;
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 440px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2.25rem;
+    box-shadow: 0 10px 30px rgba(17, 24, 39, .06);
+}
+
+.auth-card input {
+    display: block;
+    width: 100%;
+    padding: .65rem .8rem;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    color: var(--text);
+    background: var(--surface);
+}
+
+.auth-card input:focus {
+    outline: 0;
+    border-color: var(--brand);
+    box-shadow: 0 0 0 .2rem rgba(155, 48, 255, .15);
+}
+
+.auth-card .form-label {
+    color: var(--text);
+    font-weight: 500;
+}
+
+.auth-error,
+.auth-field-error {
+    color: var(--down-text);
+}
+
+.auth-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    padding: .6rem .8rem;
+}
+
+.auth-field-error {
+    font-size: .875rem;
+    margin-top: .25rem;
+}
+
+.dropdown-menu {
+    background-color: var(--surface) !important;
+    border: 1px solid var(--border) !important;
+}
+
+.dropdown-item {
+    color: var(--text-secondary);
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+    color: var(--text);
+    background-color: var(--brand-soft);
+}
+
+.list-group-item.bg-dark {
+    border-color: var(--border) !important;
+}
+
+.list-group-item-action:hover {
+    background-color: var(--brand-soft) !important;
+}
+
+/*** Price movement: colour plus ▲/▼ so it never relies on colour alone ***/
+.text-up {
+    color: var(--up-text) !important;
+}
+
+.text-down {
+    color: var(--down-text) !important;
+}
+
+.text-alert {
+    color: var(--down) !important;
+}
+
+/*** Footer stays at the bottom of the window on short pages ***/
+.content {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.content > .site-footer {
+    margin-top: auto;
+}

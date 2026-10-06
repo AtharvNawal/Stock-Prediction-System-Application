@@ -1,0 +1,7 @@
+            <div class="container-fluid pt-4 px-4 company-section" id="{{ id }}">
+                <div class="bg-secondary rounded p-4">
+                    <h6 class="mb-1">{{ title }}</h6>
+                    <p class="small mb-3">{% if plain %}Calculated from the annual statements{% else %}Consolidated figures in {{ unit }}{% endif %}{% if note %} &middot; {{ note }}{% endif %}</p>
+                    {% include 'company_grid.html' with table=table %}
+                </div>
+            </div>

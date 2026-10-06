@@ -1,0 +1,277 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ name }} · InvestIQ{% endblock %}
+
+{% block content %}
+            <style>
+                .section-nav { position: sticky; top: 64px; z-index: 5; background: var(--bg); }
+                .section-nav a { text-decoration: none; padding: .4rem .75rem; border-radius: 6px; white-space: nowrap; color: var(--text-secondary); }
+                .section-nav a:hover { background: var(--brand-soft); color: var(--text); }
+                .company-section { scroll-margin-top: 130px; }
+                .ratio-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .25rem 2rem; }
+                .ratio-grid div { display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding: .45rem 0; }
+                .ratio-grid strong { color: var(--text); }
+                .fin-table td:first-child, .fin-table th:first-child { position: sticky; left: 0; background: var(--surface); text-align: left; min-width: 210px; }
+                .fin-table td, .fin-table th { text-align: right; white-space: nowrap; }
+                .fin-table tr.strong td { color: var(--text); font-weight: 600; }
+                .growth-box { border: 1px solid var(--border); border-radius: 8px; padding: .75rem 1rem; }
+                .growth-box div { display: flex; justify-content: space-between; }
+                .pros { border-left: 4px solid var(--up); }
+                .cons { border-left: 4px solid var(--down); }
+            </style>
+
+            <!-- Section menu -->
+            <div class="container-fluid px-4 pt-3 section-nav">
+                <div class="d-flex overflow-auto gap-1 py-2">
+                    <a href="#forecast">Forecast</a><a href="#chart">Chart</a><a href="#analysis">Analysis</a><a href="#peers">Peers</a>
+                    <a href="#quarters">Quarters</a><a href="#profit-loss">Profit &amp; Loss</a><a href="#balance-sheet">Balance Sheet</a>
+                    <a href="#cash-flow">Cash Flow</a><a href="#ratios">Ratios</a><a href="#investors">Investors</a><a href="#documents">Documents</a>
+                </div>
+            </div>
+
+            <!-- Header -->
+            <div class="container-fluid pt-3 px-4">
+                <div class="bg-secondary rounded p-4">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start">
+                        <div class="mb-3">
+                            <h3 class="mb-1">{{ name }}</h3>
+                            <div class="d-flex align-items-baseline gap-3">
+                                <span class="h4 mb-0">{{ price }}</span>
+                                {% if change %}<span class="{{ change.1 }} fw-semibold">{{ change.0 }}</span>{% endif %}
+                                <span class="small">{{ price_date }} &middot; close price</span>
+                            </div>
+                            {% if sector %}<div class="small mt-1">{{ sector }}</div>{% endif %}
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            {% for label, url in links %}
+                            <a class="btn btn-sm btn-outline-primary" href="{{ url }}" target="_blank" rel="noopener">{{ label }}</a>
+                            {% endfor %}
+                            <a class="btn btn-sm btn-primary" href="#forecast">AI Forecast</a>
+                        </div>
+                    </div>
+                    <div class="row g-4">
+                        {% if about %}
+                        <div class="col-lg-5">
+                            <h6>About</h6>
+                            <details>
+                                <summary class="small mb-2">{{ about|truncatewords:45 }}</summary>
+                                <p class="small mb-0">{{ about }}</p>
+                            </details>
+                        </div>
+                        {% endif %}
+                        <div class="{% if about %}col-lg-7{% else %}col-12{% endif %}">
+                            <div class="ratio-grid">
+                                {% for label, value in key_ratios %}
+                                <div><span>{{ label }}</span><strong>{{ value }}</strong></div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI forecast (loaded after the page, since training the models takes a while) -->
+            <div class="container-fluid pt-4 px-4 company-section" id="forecast">
+                <div class="bg-secondary rounded p-4">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+                        <h6 class="mb-2">AI Price Forecast</h6>
+                        <div class="d-flex flex-wrap gap-2 mb-2" role="group" aria-label="Forecast horizon" id="horizons">
+                            {% for d, label in horizons %}
+                            <button type="button" class="btn btn-sm {% if d == days %}btn-primary{% else %}btn-outline-primary{% endif %}"
+                                    data-days="{{ d }}" aria-pressed="{% if d == days %}true{% else %}false{% endif %}">{{ label }}</button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div id="forecast-body"></div>
+                </div>
+            </div>
+
+            <!-- Chart -->
+            <div class="container-fluid pt-4 px-4 company-section" id="chart">
+                <div class="bg-secondary rounded p-4">
+                    <h6 class="mb-2">Price, 50 &amp; 200 Day Moving Averages and Volume</h6>
+                    {% if chart %}{% autoescape off %}{{ chart }}{% endautoescape %}{% else %}<p class="mb-0">No price history available.</p>{% endif %}
+                </div>
+            </div>
+
+            <!-- Pros & cons -->
+            <div class="container-fluid pt-4 px-4 company-section" id="analysis">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="bg-secondary rounded p-4 h-100 pros">
+                            <h6 class="text-up">Pros</h6>
+                            <ul class="mb-0">{% for p in pros %}<li>{{ p }}</li>{% empty %}<li>No notable strengths found in the available data.</li>{% endfor %}</ul>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="bg-secondary rounded p-4 h-100 cons">
+                            <h6 class="text-down">Cons</h6>
+                            <ul class="mb-0">{% for c in cons %}<li>{{ c }}</li>{% empty %}<li>No notable weaknesses found in the available data.</li>{% endfor %}</ul>
+                        </div>
+                    </div>
+                </div>
+                <p class="small mt-2 mb-0">* The pros and cons are generated automatically from the financial data below.</p>
+            </div>
+
+            <!-- Peers (loaded after the page) -->
+            <div class="container-fluid pt-4 px-4 company-section" id="peers">
+                <div class="bg-secondary rounded p-4">
+                    <h6 class="mb-3">Peer Comparison</h6>
+                    <div id="peers-body"><p class="small mb-0">Loading peer companies&hellip;</p></div>
+                </div>
+            </div>
+
+            {% include 'company_table.html' with id='quarters' title='Quarterly Results' table=quarters note='Yahoo Finance provides about the last 5 quarters, and its quarterly figures have no separate depreciation line.' %}
+
+            <div class="container-fluid pt-4 px-4 company-section" id="profit-loss">
+                <div class="bg-secondary rounded p-4">
+                    <h6 class="mb-1">Profit &amp; Loss</h6>
+                    <p class="small mb-3">Consolidated figures in {{ unit }}</p>
+                    {% include 'company_grid.html' with table=pnl %}
+                    <div class="row g-3 mt-2">
+                        {% for title, values in growth %}
+                        <div class="col-sm-6 col-xl-3">
+                            <div class="growth-box h-100">
+                                <strong class="d-block mb-1" style="color: var(--text)">{{ title }}</strong>
+                                {% for label, v in values %}
+                                <div><span>{{ label }}:</span><span class="{{ v.1 }}">{{ v.0 }}</span></div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {% include 'company_table.html' with id='balance-sheet' title='Balance Sheet' table=balance %}
+            {% include 'company_table.html' with id='cash-flow' title='Cash Flows' table=cashflow %}
+            {% include 'company_table.html' with id='ratios' title='Ratios' table=ratios note='Days are based on sales and cost of sales for the year. ROCE = EBIT / (total assets - current liabilities).' plain=True %}
+
+            <!-- Investors -->
+            <div class="container-fluid pt-4 px-4 company-section" id="investors">
+                <div class="bg-secondary rounded p-4">
+                    <h6 class="mb-3">Shareholding Pattern</h6>
+                    {% if holding %}
+                    <div class="table-responsive">
+                        <table class="table text-start align-middle table-bordered mb-0" style="max-width: 520px">
+                            <tbody>
+                                {% for label, pct in holding.items %}
+                                <tr><td>{{ label }}</td><td class="text-end">{{ pct|floatformat:2 }}%</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="small mt-3 mb-0">Latest snapshot from Yahoo Finance. For Indian companies, insiders are mostly the promoter group. The quarterly promoter / FII / DII breakdown is published in the company's filings on NSE and BSE (see Documents).</p>
+                    {% else %}
+                    <p class="mb-0">Shareholding data isn't available for this company.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Documents -->
+            <div class="container-fluid pt-4 px-4 company-section" id="documents">
+                <div class="bg-secondary rounded p-4">
+                    <h6 class="mb-3">Documents</h6>
+                    <p class="mb-3">Announcements, annual reports, credit ratings and concall transcripts are published on the exchange and company websites:</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for label, url in links %}
+                        <a class="btn btn-outline-primary" href="{{ url }}" target="_blank" rel="noopener">{{ label }}</a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="container-fluid pt-3 px-4">
+                <p class="small mb-0">Financial data from Yahoo Finance, which keeps about 5 years of annual and 5 quarters of quarterly results; figures can differ slightly from the company's filings. Not investment advice.</p>
+            </div>
+
+            {% if not chart %}<script src="https://cdn.plot.ly/plotly-4.1.1.min.js"></script>{% endif %}
+            <script>
+                // keep the section menu just below the sticky header, whatever its height
+                (function () {
+                    var header = document.querySelector('.site-header'), nav = document.querySelector('.section-nav');
+                    function place() { nav.style.top = (getComputedStyle(header).position === 'sticky' ? header.offsetHeight : 0) + 'px'; }
+                    place();
+                    window.addEventListener('resize', place);
+                })();
+
+                // AI forecast: loaded separately, re-loaded when a different horizon is picked
+                (function () {
+                    var body = document.getElementById('forecast-body');
+                    var url = '/company/{{ symbol|urlencode }}/forecast/';
+
+                    function runScripts(container) {
+                        // scripts inserted with innerHTML don't run; re-create them so the charts draw
+                        container.querySelectorAll('script').forEach(function (old) {
+                            var s = document.createElement('script');
+                            s.text = old.text;
+                            old.replaceWith(s);
+                        });
+                    }
+
+                    function load(days) {
+                        document.querySelectorAll('#horizons [data-days]').forEach(function (b) {
+                            var on = parseInt(b.dataset.days, 10) === days;
+                            b.classList.toggle('btn-primary', on);
+                            b.classList.toggle('btn-outline-primary', !on);
+                            b.setAttribute('aria-pressed', on);
+                        });
+                        body.innerHTML = '<div class="d-flex align-items-center gap-3 py-4" role="status">' +
+                            '<div class="spinner-border text-primary"></div>' +
+                            '<div><strong style="color: var(--text)">Training 4 AI models&hellip;</strong>' +
+                            '<div class="small">The first forecast for a company takes about 15 seconds.</div></div></div>';
+                        fetch(url + '?days=' + days)
+                            .then(function (r) { return r.text(); })
+                            .then(function (html) { body.innerHTML = html; runScripts(body); })
+                            .catch(function () { body.innerHTML = '<p class="mb-0">The forecast could not be loaded. Please try again.</p>'; });
+                        history.replaceState(null, '', '?days=' + days + window.location.hash);
+                    }
+
+                    // horizon buttons, plus the "forecast N days instead" button inside the section
+                    document.getElementById('forecast').addEventListener('click', function (e) {
+                        var btn = e.target.closest('[data-days]');
+                        if (btn) { load(parseInt(btn.dataset.days, 10)); }
+                    });
+                    load({{ days }});
+                })();
+
+                // Rescale the price and volume axes to the selected period (1M ... Max)
+                (function () {
+                    var gd = document.querySelector('#chart .plotly-graph-div');
+                    if (!gd || !window.Plotly) { return; }
+                    var busy = false;
+                    function extent(trace, lo, hi) {
+                        var min = Infinity, max = -Infinity;
+                        for (var i = 0; i < trace.x.length; i++) {
+                            var t = new Date(trace.x[i]).getTime(), y = trace.y[i];
+                            if (t >= lo && t <= hi && y !== null && !isNaN(y)) { min = Math.min(min, y); max = Math.max(max, y); }
+                        }
+                        return [min, max];
+                    }
+                    function rescale() {
+                        if (busy) { return; }
+                        var range = gd.layout.xaxis2.range || gd.layout.xaxis.range;
+                        if (!range) { return; }
+                        var lo = new Date(range[0]).getTime(), hi = new Date(range[1]).getTime();
+                        var price = [Infinity, -Infinity];
+                        for (var k = 0; k < 3; k++) {
+                            var e = extent(gd.data[k], lo, hi);
+                            price = [Math.min(price[0], e[0]), Math.max(price[1], e[1])];
+                        }
+                        var volume = extent(gd.data[3], lo, hi);
+                        if (!isFinite(price[0])) { return; }
+                        var pad = (price[1] - price[0]) * 0.05 || price[0] * 0.05;
+                        busy = true;
+                        Plotly.relayout(gd, {'yaxis.range': [price[0] - pad, price[1] + pad], 'yaxis2.range': [0, volume[1] * 1.05]})
+                            .then(function () { busy = false; });
+                    }
+                    gd.on('plotly_relayout', rescale);
+                    rescale();
+                })();
+
+                fetch('/company/{{ symbol|urlencode }}/peers/')
+                    .then(function (r) { return r.text(); })
+                    .then(function (html) { document.getElementById('peers-body').innerHTML = html; })
+                    .catch(function () { document.getElementById('peers-body').innerHTML = '<p class="small mb-0">Peer comparison could not be loaded.</p>'; });
+            </script>
+{% endblock %}

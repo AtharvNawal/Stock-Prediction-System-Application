@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block content %}
+            <style>
+                .home-search { display: flex; align-items: center; background: var(--surface); border: 1px solid #d1d5db; border-radius: 8px; padding: 0 .9rem; min-width: min(420px, 100%); }
+                .home-search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 .2rem rgba(155, 48, 255, .15); }
+                .home-search input { flex: 1; border: 0; outline: 0; background: transparent; padding: .65rem .6rem; color: var(--text); }
+                .tile { height: 100%; }
+                .tile .value { font-size: 1.35rem; font-weight: 700; color: var(--text); }
+                .tile svg { width: 100%; height: 36px; display: block; }
+                .movers td, .movers th { white-space: nowrap; padding-left: .4rem; padding-right: .4rem; }
+                .movers th { font-size: .9rem; }
+                .movers td:nth-child(n+2), .movers th:nth-child(n+2) { text-align: right; }
+                .breadth { height: 8px; border-radius: 4px; overflow: hidden; display: flex; background: var(--border); }
+                .breadth .adv { background: var(--up); }
+                .breadth .dec { background: var(--down); }
+            </style>
+
+            <!-- Header -->
+            <div class="container-fluid pt-4 px-4">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div>
+                        <h4 class="mb-1">Market Overview</h4>
+                        <span class="small">{{ today }}</span>
+                    </div>
+                    <form action="/" method="get" class="home-search" role="search">
+                        <i class="fa fa-search" style="color: var(--text-secondary)"></i>
+                        <input type="text" name="q" placeholder="Search a company to forecast and analyse" aria-label="Search a company">
+                    </form>
+                </div>
+            </div>
+
+            <!-- Index tiles -->
+            <div class="container-fluid pt-4 px-4">
+                <div class="row g-3">
+                    {% for t in tiles %}
+                    <div class="col-6 col-md-4 col-xl-2">
+                        <div class="bg-secondary rounded p-3 tile">
+                            <div class="small mb-1">{{ t.name }}</div>
+                            <div class="value">{{ t.value }}</div>
+                            <div class="{{ t.class }} small fw-semibold mb-2">{{ t.change }} <span class="fw-normal" style="color: var(--text-secondary)">today</span></div>
+                            <svg viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true">
+                                <polyline points="{{ t.points }}" fill="none" stroke-width="2"
+                                          stroke="{% if t.up %}var(--up){% else %}var(--down){% endif %}" vector-effect="non-scaling-stroke"/>
+                            </svg>
+                            <div class="small mt-1">1 month: <span class="{{ t.month.1 }}">{{ t.month.0 }}</span></div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="col-12"><div class="bg-secondary rounded p-3">Market data is unavailable right now. Please try again in a minute.</div></div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Performance chart -->
+            <div class="container-fluid pt-4 px-4">
+                <div class="bg-secondary rounded p-4">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <h6 class="mb-0">Top NSE Stocks: % Return</h6>
+                        <a href="/ticker/">All companies</a>
+                    </div>
+                    {% if performance %}
+                        {% autoescape off %}{{ performance }}{% endautoescape %}
+                    {% else %}
+                        <p class="mb-0">Chart data is unavailable right now.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- NIFTY 50 movers -->
+            {% if movers %}
+            <div class="container-fluid pt-4 px-4">
+                <div class="bg-secondary rounded p-4 mb-0">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                        <h6 class="mb-0">NIFTY 50 Today</h6>
+                        <span class="small"><span class="text-up">▲ {{ movers.advances }} advancing</span> &middot; <span class="text-down">▼ {{ movers.declines }} declining</span></span>
+                    </div>
+                    <div class="breadth mb-1" role="img" aria-label="{{ movers.advances }} advancing, {{ movers.declines }} declining">
+                        <div class="adv" style="flex: {{ movers.advances }}"></div>
+                        <div class="dec" style="flex: {{ movers.declines }}"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid pt-4 px-4">
+                <div class="row g-4">
+                    {% include 'home_movers.html' with title='Top Gainers' rows=movers.gainers heading='Change' %}
+                    {% include 'home_movers.html' with title='Top Losers' rows=movers.losers heading='Change' %}
+                    {% include 'home_movers.html' with title='Most Active' rows=movers.active heading='Turnover' %}
+                </div>
+            </div>
+            {% endif %}
+{% endblock %}

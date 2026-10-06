@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+
+{% block content %}
+            <style>
+                .predict-hero { min-height: calc(100vh - 160px); display: flex; align-items: center; justify-content: center; }
+                .predict-hero .inner { width: 100%; max-width: 760px; text-align: center; }
+                .wordmark { font-family: 'Roboto', sans-serif; font-weight: 700; font-size: clamp(3rem, 9vw, 5.5rem); letter-spacing: -2px; color: var(--text); line-height: 1; }
+                .wordmark .bars { display: inline-flex; align-items: flex-end; gap: 6px; height: .62em; margin-left: 8px; }
+                .wordmark .bars span { width: 10px; border-radius: 3px; background: var(--brand); }
+                .wordmark .bars span:nth-child(1) { height: 40%; opacity: .55; }
+                .wordmark .bars span:nth-child(2) { height: 70%; opacity: .8; }
+                .wordmark .bars span:nth-child(3) { height: 100%; }
+                .tagline { font-size: 1.25rem; color: var(--text); margin: 1.25rem 0 2rem; }
+                .search-wrap { position: relative; text-align: left; }
+                .search-box { display: flex; align-items: center; background: var(--surface); border: 1px solid #d1d5db; border-radius: 8px; padding: 0 1rem; box-shadow: 0 1px 2px rgba(0, 0, 0, .04); }
+                .search-box:focus-within { border-color: var(--brand); box-shadow: 0 0 0 .2rem rgba(155, 48, 255, .15); }
+                .search-box i { color: var(--text-secondary); font-size: 1.2rem; }
+                .search-box input { flex: 1; border: 0; outline: 0; background: transparent; padding: 1.05rem .9rem; font-size: 1.15rem; color: var(--text); }
+                .suggestions { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 20; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(17, 24, 39, .08); overflow: hidden; display: none; }
+                .suggestions a { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .7rem 1rem; text-decoration: none; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+                .suggestions a:last-child { border-bottom: 0; }
+                .suggestions a.active, .suggestions a:hover { background: var(--brand-soft); color: var(--text); }
+                .suggestions .sym { color: var(--text); font-weight: 600; margin-right: .5rem; }
+                .suggestions .exch { font-size: .8rem; white-space: nowrap; }
+                .horizon { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .5rem; margin-top: 1.25rem; }
+                .horizon .btn { min-width: 84px; }
+                .chips { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .75rem; margin-top: 1.75rem; }
+                .chips .label { font-size: 1.1rem; color: var(--text); margin-right: .25rem; }
+                .chip { border: 1px solid #d1d5db; border-radius: 6px; padding: .45rem .9rem; background: transparent; color: var(--text-secondary); text-decoration: none; }
+                .chip:hover, .chip:first-of-type { background: var(--surface); color: var(--accent); border-color: var(--border); }
+                .loading { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; background: rgba(244, 245, 247, .92); }
+                .loading.show { display: flex; }
+            </style>
+
+            <div class="container-fluid px-4 predict-hero">
+                <div class="inner">
+                    <div class="wordmark">InvestIQ<span class="bars"><span></span><span></span><span></span></span></div>
+                    <p class="tagline">AI stock price forecasts and company analysis for NSE, BSE and US companies.</p>
+
+                    <form id="predict-form" class="search-wrap" autocomplete="off">
+                        <div class="search-box">
+                            <i class="fa fa-search"></i>
+                            <input id="tickerinp" type="text" placeholder="Search for a company" aria-label="Search for a company"
+                                   aria-autocomplete="list" aria-controls="suggestions" required autofocus>
+                        </div>
+                        <div id="suggestions" class="suggestions" role="listbox"></div>
+                    </form>
+
+                    <div class="horizon" role="group" aria-label="Forecast horizon">
+                        <span class="me-1">Forecast for</span>
+                        {% for days, label in horizons %}
+                        <button type="button" class="btn btn-sm {% if days == 30 %}btn-primary{% else %}btn-outline-primary{% endif %}" data-days="{{ days }}"
+                                aria-pressed="{% if days == 30 %}true{% else %}false{% endif %}">{{ label }}</button>
+                        {% endfor %}
+                    </div>
+
+                    <div class="chips">
+                        <span class="label">Or predict:</span>
+                        {% for symbol, name in popular %}
+                        <a class="chip" href="/company/{{ symbol|urlencode }}/" data-symbol="{{ symbol }}">{{ name }}</a>
+                        {% endfor %}
+                    </div>
+
+                    <p class="small mt-4 mb-0"><a href="/ticker/">Browse all {{ company_count }} companies</a></p>
+                </div>
+            </div>
+
+            <div id="loading" class="loading" role="status" aria-live="polite">
+                <div class="text-center">
+                    <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
+                    <h5 class="mb-1">Loading company data&hellip;</h5>
+                    <p class="mb-0">The AI forecast and full analysis will open on one page.</p>
+                </div>
+            </div>
+
+            <script>
+                (function () {
+                    var input = document.getElementById('tickerinp');
+                    var box = document.getElementById('suggestions');
+                    var days = 30, items = [], active = -1, timer = null;
+
+                    function go(symbol) {
+                        document.getElementById('loading').classList.add('show');
+                        window.location.href = '/company/' + encodeURIComponent(symbol) + '/?days=' + days;
+                    }
+
+                    // Forecast horizon buttons
+                    document.querySelectorAll('.horizon [data-days]').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            days = parseInt(btn.dataset.days, 10);
+                            document.querySelectorAll('.horizon [data-days]').forEach(function (b) {
+                                var on = b === btn;
+                                b.classList.toggle('btn-primary', on);
+                                b.classList.toggle('btn-outline-primary', !on);
+                                b.setAttribute('aria-pressed', on);
+                            });
+                        });
+                    });
+
+                    // Quick picks use the selected horizon
+                    document.querySelectorAll('.chip').forEach(function (chip) {
+                        chip.addEventListener('click', function (e) { e.preventDefault(); go(chip.dataset.symbol); });
+                    });
+
+                    function render() {
+                        box.innerHTML = '';
+                        items.forEach(function (r, i) {
+                            var a = document.createElement('a');
+                            a.href = '#';
+                            a.setAttribute('role', 'option');
+                            a.className = i === active ? 'active' : '';
+                            var left = document.createElement('span');
+                            var sym = document.createElement('span');
+                            sym.className = 'sym';
+                            sym.textContent = r.listed;
+                            left.appendChild(sym);
+                            left.appendChild(document.createTextNode(r.name));
+                            var exch = document.createElement('span');
+                            exch.className = 'exch';
+                            exch.textContent = r.exchange;
+                            a.appendChild(left);
+                            a.appendChild(exch);
+                            a.addEventListener('mousedown', function (e) { e.preventDefault(); go(r.symbol); });
+                            box.appendChild(a);
+                        });
+                        box.style.display = items.length ? 'block' : 'none';
+                    }
+
+                    input.addEventListener('input', function () {
+                        clearTimeout(timer);
+                        var q = input.value.trim();
+                        if (!q) { items = []; render(); return; }
+                        timer = setTimeout(function () {
+                            fetch('/api/companies/?q=' + encodeURIComponent(q))
+                                .then(function (r) { return r.json(); })
+                                .then(function (data) {
+                                    if (input.value.trim() !== q) { return; }
+                                    items = data.results; active = items.length ? 0 : -1; render();
+                                });
+                        }, 120);
+                    });
+
+                    input.addEventListener('keydown', function (e) {
+                        if (e.key === 'ArrowDown' && items.length) { e.preventDefault(); active = (active + 1) % items.length; render(); }
+                        else if (e.key === 'ArrowUp' && items.length) { e.preventDefault(); active = (active - 1 + items.length) % items.length; render(); }
+                        else if (e.key === 'Escape') { items = []; render(); }
+                    });
+                    input.addEventListener('blur', function () { setTimeout(function () { box.style.display = 'none'; }, 150); });
+                    input.addEventListener('focus', function () { if (items.length) { box.style.display = 'block'; } });
+
+                    document.getElementById('predict-form').addEventListener('submit', function (e) {
+                        e.preventDefault();
+                        var q = input.value.trim();
+                        if (active >= 0 && items[active]) { go(items[active].symbol); }
+                        else if (q) { go(q); }
+                    });
+
+                    // /?q=tata pre-fills the search box
+                    var preset = new URLSearchParams(window.location.search).get('q');
+                    if (preset) { input.value = preset; input.dispatchEvent(new Event('input')); }
+
+                    // Hide the loading overlay if the user comes back with the browser's back button
+                    window.addEventListener('pageshow', function () { document.getElementById('loading').classList.remove('show'); });
+                })();
+            </script>
+{% endblock %}

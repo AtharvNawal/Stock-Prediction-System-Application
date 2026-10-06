@@ -1,0 +1,63 @@
+{% if message %}
+<p class="mb-0">We’re sorry, {{ message }}</p>
+{% if max_horizon %}
+<button type="button" class="btn btn-primary mt-3" data-days="{{ max_horizon }}">Forecast {{ max_horizon }} days instead</button>
+{% endif %}
+{% if intraday %}<div class="mt-4">{% autoescape off %}{{ intraday }}{% endautoescape %}</div>{% endif %}
+{% else %}
+<div class="d-flex flex-wrap align-items-baseline gap-3 mb-3">
+    <span>AI forecast for {{ number_of_days }} trading day{{ number_of_days|pluralize }} ahead:</span>
+    <span class="h4 mb-0">{{ currency_symbol }} {{ ensemble_price|floatformat:2 }}</span>
+    <span class="{{ ensemble_change.1 }} fw-semibold">{{ ensemble_change.0 }}</span>
+    <span class="small">weighted ensemble of 4 models</span>
+</div>
+<div class="row g-4">
+    <div class="col-xl-6">
+        <h6 class="mb-2">Predicted price for the next {{ number_of_days }} trading day{{ number_of_days|pluralize }}</h6>
+        {% autoescape off %}{{ forecast_chart }}{% endautoescape %}
+    </div>
+    <div class="col-xl-6">
+        <h6 class="mb-2">Latest trading session</h6>
+        {% autoescape off %}{{ intraday }}{% endautoescape %}
+    </div>
+</div>
+
+<div class="d-flex flex-wrap align-items-center justify-content-between mt-4 mb-3">
+    <h6 class="mb-0">Model accuracy, {{ number_of_days }} days ahead</h6>
+    <span class="small">Tested on {{ n_test }} past forecasts the models never saw</span>
+</div>
+<div class="table-responsive">
+    <table class="table text-start align-middle table-bordered table-hover mb-0">
+        <thead>
+            <tr>
+                <th scope="col">Model</th>
+                <th scope="col">Avg. Price Error</th>
+                <th scope="col">Error on Day {{ number_of_days }}</th>
+                <th scope="col">Direction Correct</th>
+                <th scope="col">Ensemble Weight</th>
+                <th scope="col">Forecast for Day {{ number_of_days }}</th>
+                <th scope="col">vs. Today</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in models %}
+            <tr{% if m.name == 'Weighted Ensemble' %} class="fw-bold" style="color: var(--text)"{% endif %}>
+                <td>{{ m.name }}</td>
+                <td>{{ m.mape|floatformat:2 }}%</td>
+                <td>{{ m.final_mape|floatformat:2 }}%</td>
+                <td>{% if m.direction is None %}&ndash;{% else %}{{ m.direction|floatformat:1 }}%{% endif %}</td>
+                <td>{% if m.weight is None or m.name == 'Weighted Ensemble' %}&ndash;{% else %}{{ m.weight|floatformat:0 }}%{% endif %}</td>
+                <td>{{ currency_symbol }}{{ m.forecast|last|floatformat:2 }}</td>
+                <td class="{{ m.change_class }}">{{ m.change }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<p class="small mt-3 mb-0">
+    Lower error is better. A model is only useful if it beats the naive baseline, which assumes the price stays flat.
+    {{ listed }} rose over {{ up_rate|floatformat:0 }}% of the {{ number_of_days }}-day test windows, so always guessing
+    "{% if up_rate >= 50 %}up{% else %}down{% endif %}" would get the direction right {% if up_rate >= 50 %}{{ up_rate|floatformat:0 }}{% else %}{{ down_rate|floatformat:0 }}{% endif %}% of the time.
+    Forecasts are not financial advice.
+</p>
+{% endif %}
