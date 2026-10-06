@@ -139,20 +139,17 @@
 
 
 ## Output Screen-shots:
-The Home page of the application that displays real time data of stock prices.
-![image](https://user-images.githubusercontent.com/76027425/179440522-674b6e07-31dc-422f-81e3-0e0c9c74c85a.png)
+The Home page: search any NSE, BSE or US company (with live suggestions), pick a forecast horizon from 7 days to 1 year, or start from a popular company.
+![InvestIQ home page with company search, forecast horizon and quick picks](docs/screenshots/home.png)
 
-To Predict stock price we move on to predicition page where we need to enter valid ticker value and number of days and click predict button.
-![image](https://user-images.githubusercontent.com/76027425/179440538-a7054ec1-ce3b-44b1-b55e-72bf7e23692c.png)
+The Market Overview page shows the main indices (NIFTY 50, SENSEX, NIFTY Bank, S&P 500, NASDAQ, USD/INR) with today's change and a one-month trend, the % return of top NSE stocks, and today's NIFTY 50 gainers, losers and most active stocks.
+![Market Overview page with index tiles, return chart and NIFTY 50 movers](docs/screenshots/market-overview.png)
 
-This page displays the predicted stock price alsong with searched ticker details and also generating unique QR Code to view the predicted result.
-![image](https://user-images.githubusercontent.com/76027425/179440583-dcb85f97-d358-42d7-a7b4-661461135efd.png)
+The Ticker Info page lists all 5,971 supported companies with their exact NSE/BSE symbols, searchable by symbol or name. Each symbol opens that company's AI forecast and analysis.
+![Ticker Info page listing all supported companies](docs/screenshots/ticker-info.png)
 
-The Left Graph is the real time stock price of the searched ticker for past 1day & the Right Graph is the predicted stock price for the number of days searched.
-![image](https://user-images.githubusercontent.com/76027425/179440591-06b8b095-d2c4-4df8-93d7-fe389b748470.png)
-
-The Ticker Info page displays the details of all the valid tickers accepted by the application.
-![image](https://user-images.githubusercontent.com/76027425/179440611-3552e15a-a66e-464b-a000-cb45b864352c.png)
+Users can create a free account and log in.
+![Login page](docs/screenshots/login.png)
 
 
 
