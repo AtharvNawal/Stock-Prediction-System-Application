@@ -14,7 +14,6 @@ class Project(models.Model):
         return str(self.name)
 
     def save(self, *args, **kwargs):
-        print(self.start_date.isocalendar()[1])
         if self.week_number == "":
             self.week_number = self.start_date.isocalendar()[1]
         super().save(*args, **kwargs)

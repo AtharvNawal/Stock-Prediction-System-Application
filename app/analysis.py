@@ -16,6 +16,8 @@ import pandas as pd
 import yfinance as yf
 from yfinance.exceptions import YFRateLimitError
 
+from .caching import LRUCache
+
 warnings.simplefilter('ignore', DeprecationWarning)
 
 
@@ -314,22 +316,17 @@ def build(symbol):
     }
 
 
-_cache = OrderedDict()
+_cache = LRUCache(64)
 
 
 def company(symbol):
     """Analysis for `symbol`, cached for the day. Raises YFRateLimitError if Yahoo is throttling."""
-    key = (symbol, pd.Timestamp.today().date())
-    if key not in _cache:
-        _cache[key] = build(symbol)
-        while len(_cache) > 64:
-            _cache.popitem(last=False)
-    return _cache[key]
+    return _cache.get_or_compute((symbol, pd.Timestamp.today().date()), lambda: build(symbol))
 
 
 # ============================================== Peers ==============================================
 
-_peer_cache = OrderedDict()
+_peer_cache = LRUCache(512)
 
 
 def peer_metrics(symbols):
@@ -338,12 +335,13 @@ def peer_metrics(symbols):
 
     def one(symbol):
         key = (symbol, today)
-        if key not in _peer_cache:
+        cached = _peer_cache.get(key)
+        if cached is None:
             try:
                 info = yf.Ticker(symbol).info or {}
             except YFRateLimitError:
                 return symbol, None
-            _peer_cache[key] = {
+            cached = {
                 'price': info.get('currentPrice') or info.get('regularMarketPrice'),
                 'pe': info.get('trailingPE'),
                 'market_cap': info.get('marketCap'),
@@ -352,9 +350,8 @@ def peer_metrics(symbols):
                 'year_change': info.get('52WeekChange'),
                 'industry': info.get('industry'),
             }
-            while len(_peer_cache) > 512:
-                _peer_cache.popitem(last=False)
-        return symbol, _peer_cache[key]
+            _peer_cache.set(key, cached)
+        return symbol, cached
 
     with ThreadPoolExecutor(4) as pool:
         return dict(pool.map(one, symbols))
