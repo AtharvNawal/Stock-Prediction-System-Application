@@ -1,0 +1,14 @@
+.git
+.github
+.venv
+virtualenv
+**/__pycache__
+*.pyc
+*.log
+.env
+db.sqlite3
+staticfiles
+docs
+.DS_Store
+.coverage
+coverage.xml

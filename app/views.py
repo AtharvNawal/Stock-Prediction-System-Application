@@ -5,7 +5,6 @@ from plotly.offline import plot
 import plotly.graph_objects as go
 
 import pandas as pd
-import json
 import re
 from urllib.parse import quote
 import warnings
@@ -14,6 +13,8 @@ import yfinance as yf
 from yfinance.exceptions import YFRateLimitError
 
 from . import dataset, forecasting
+from .caching import TTLCache
+from .companies import SUPPORTED, CompanyDirectory
 
 
 CHART_TICKERS = ['RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 'ICICIBANK.NS', 'BHARTIARTL.NS']
@@ -23,13 +24,9 @@ INDICES = [('^NSEI', 'NIFTY 50', ''), ('^BSESN', 'SENSEX', ''), ('^NSEBANK', 'NI
 
 # The companies the app supports: everything listed on NSE/BSE plus well-known US companies
 # (S&P 500 and NASDAQ-100). Rebuild with scripts/build_companies.py.
-COMPANIES = pd.read_csv('app/Data/companies.csv', index_col='Symbol', keep_default_na=False, dtype=str)
-# Exact symbol as listed on the exchange (RELIANCE, M&M, BRK.B) -> Yahoo symbol (RELIANCE.NS, M&M.NS, BRK-B)
-LISTED_TO_YAHOO = {listed: sym for sym, listed in COMPANIES['Listed'].items() if listed not in COMPANIES.index}
-# Old NSE symbol -> current one, e.g. TATAMOTORS.NS -> TMPV.NS, ZOMATO.NS -> ETERNAL.NS
-SYMBOL_CHANGES = pd.read_csv('app/Data/symbol_changes.csv', index_col='Old')['New']
-OLD_SYMBOLS = SYMBOL_CHANGES.groupby(SYMBOL_CHANGES).groups  # current symbol -> its old symbols
-SUPPORTED = "companies listed on NSE or BSE, and well-known US companies (S&P 500 and NASDAQ-100)"
+DIRECTORY = CompanyDirectory.from_csv()
+# Home page market data, reused for 5 minutes so reloads don't hit Yahoo every time
+MARKET_CACHE = TTLCache(maxsize=16, ttl=300)
 
 # Exchange/Yahoo symbols: letters, digits and . - & ^ = (e.g. AAPL, TMPV.NS, M&M.NS, BRK-B, ^NSEI)
 TICKER_PATTERN = re.compile(r'^[A-Z0-9.\-&^=]{1,20}$')
@@ -63,18 +60,6 @@ def movement(value, pattern):
     return pattern.format(value), ''
 
 
-def resolve_symbol(text):
-    """Supported Yahoo symbol for what the user typed, e.g. 'reliance' -> 'RELIANCE.NS', else None."""
-    text = text.strip().upper()
-    for candidate in (text, LISTED_TO_YAHOO.get(text), text + '.NS', text + '.BO'):
-        if candidate is None:
-            continue
-        candidate = SYMBOL_CHANGES.get(candidate, candidate)
-        if candidate in COMPANIES.index:
-            return candidate
-    return None
-
-
 def price_history(symbol, period, interval):
     """Yahoo prices for one symbol. Empty if Yahoo has none; raises YFRateLimitError when Yahoo
     is throttling us, so that isn't mistaken for a delisted stock."""
@@ -87,17 +72,6 @@ def price_history(symbol, period, interval):
     except Exception:
         return pd.DataFrame()
     return df.drop(columns=['Dividends', 'Stock Splits', 'Capital Gains'], errors='ignore')
-
-
-def listing(symbol):
-    """(exact listed symbol, exchange label) for a supported Yahoo symbol, e.g. ('M&M', 'NSE & BSE')."""
-    row = COMPANIES.loc[symbol]
-    exchange = 'NSE & BSE' if row['Exchange'] == 'NSE' and row['BSE'] else row['Exchange']
-    return row['Listed'], exchange
-
-
-def currency_of(symbol):
-    return '₹' if symbol.endswith(('.NS', '.BO')) else '$'
 
 
 def error(request, message, suggestions=None, number_of_days=None):
@@ -114,8 +88,8 @@ NAME_NOISE = re.compile(r'\b(common stock|ordinary shares|american depositary sh
 
 def suggest_tickers(ticker):
     """Supported, currently traded tickers for the same company, e.g. TTM (delisted ADR) -> TMPV.NS / TMCV.NS."""
-    if ticker in COMPANIES.index:
-        name = COMPANIES.loc[ticker, 'Name']
+    if ticker in DIRECTORY:
+        name = DIRECTORY.name(ticker)
     else:
         name = dataset.us_company_name(ticker) or re.sub(r'\.(NS|BO)$', '', ticker)
     words = NAME_NOISE.sub(' ', re.sub(r'[^\w\s&]', ' ', name)).split()
@@ -128,28 +102,12 @@ def suggest_tickers(ticker):
             quotes = yf.Search(query, max_results=8).quotes
         except Exception:
             return []
-        found = [{'symbol': q['symbol'], 'listed': listing(q['symbol'])[0],
-                  'name': COMPANIES.loc[q['symbol'], 'Name'], 'exchange': listing(q['symbol'])[1]}
-                 for q in quotes
-                 if q.get('symbol') != ticker and q.get('symbol') in COMPANIES.index]
+        found = [DIRECTORY.describe(q['symbol']) for q in quotes
+                 if q.get('symbol') != ticker and q.get('symbol') in DIRECTORY]
         found = list({f['listed'] + f['exchange']: f for f in found}.values())  # Yahoo can return duplicates
         if found:
             return found[:5]
     return []
-
-
-_market_cache = {}
-
-
-def cached(key, seconds, fn):
-    """Market data for the home page, reused for a few minutes so reloads don't hit Yahoo every time."""
-    now = pd.Timestamp.now()
-    hit = _market_cache.get(key)
-    if hit and (now - hit[0]).total_seconds() < seconds:
-        return hit[1]
-    value = fn()
-    _market_cache[key] = (now, value)
-    return value
 
 
 def sparkline(values, width=120, height=36):
@@ -184,15 +142,15 @@ def _performance_chart():
     closes = yf.download(CHART_TICKERS, period='1y', interval='1d', auto_adjust=False, progress=False)['Adj Close']
     periods = [('1M', 1), ('3M', 3), ('6M', 6), ('1Y', 12)]
     fig = go.Figure()
-    for p, (label, months) in enumerate(periods):
+    for label, months in periods:
         window = closes[closes.index >= closes.index[-1] - pd.DateOffset(months=months)]
         for symbol in CHART_TICKERS:
             s = window[symbol].dropna()
             if s.empty:
                 continue
-            fig.add_trace(go.Scatter(x=s.index, y=((s / s.iloc[0] - 1) * 100).round(2), name=listing(symbol)[0],
+            fig.add_trace(go.Scatter(x=s.index, y=((s / s.iloc[0] - 1) * 100).round(2), name=DIRECTORY.listing(symbol)[0],
                                      visible=(label == '3M'), legendgroup=symbol, showlegend=True,
-                                     hovertemplate='%{y:.1f}%<extra>' + listing(symbol)[0] + '</extra>'))
+                                     hovertemplate='%{y:.1f}%<extra>' + DIRECTORY.listing(symbol)[0] + '</extra>'))
     per = len(fig.data) // len(periods)
     buttons = [dict(label=label, method='update',
                     args=[{'visible': [i // per == p for i in range(len(fig.data))]}])
@@ -207,7 +165,7 @@ def _performance_chart():
 
 
 def _nifty_movers():
-    members = COMPANIES.index[COMPANIES['Nifty50'] == 'Y'].tolist()
+    members = DIRECTORY.nifty50()
     data = yf.download(members, period='5d', interval='1d', auto_adjust=False, progress=False)
     close, volume = data['Close'], data['Volume']
     rows = []
@@ -215,7 +173,7 @@ def _nifty_movers():
         c = close[symbol].dropna()
         if len(c) < 2:
             continue
-        rows.append({'symbol': symbol, 'listed': listing(symbol)[0], 'name': COMPANIES.loc[symbol, 'Name'],
+        rows.append({'symbol': symbol, 'listed': DIRECTORY.listing(symbol)[0], 'name': DIRECTORY.name(symbol),
                      'price': c.iloc[-1], 'change': (c.iloc[-1] / c.iloc[-2] - 1) * 100,
                      'traded': c.iloc[-1] * volume[symbol].reindex(c.index).iloc[-1]})
     df = pd.DataFrame(rows)
@@ -238,7 +196,7 @@ def _nifty_movers():
 def index(request):
     def safe(key, fn, default):
         try:
-            return cached(key, 300, fn)
+            return MARKET_CACHE.get_or_compute(key, fn)
         except Exception:  # Yahoo unavailable or throttling: show the rest of the page
             return default
 
@@ -265,19 +223,15 @@ def search_redirect(request):
 def search(request):
     return render(request, 'search.html', {
         'horizons': PREDICT_HORIZONS,
-        'popular': [(s, name) for s, name in POPULAR if s in COMPANIES.index],
-        'company_count': '{:,}'.format(len(COMPANIES)),
+        'popular': [(s, name) for s, name in POPULAR if s in DIRECTORY],
+        'company_count': '{:,}'.format(len(DIRECTORY)),
     })
 
 
 def ticker(request):
     # ================================================= Load Ticker Table ================================================
-    companies = COMPANIES.reset_index()
-    companies['Exchange'] = companies['Symbol'].map(lambda s: listing(s)[1])
-    ticker_list = json.loads(companies[['Symbol', 'Listed', 'Name', 'Exchange']].to_json(orient='records'))
-
     return render(request, 'ticker.html', {
-        'ticker_list': ticker_list
+        'ticker_list': DIRECTORY.records()
     })
 
 
@@ -287,23 +241,23 @@ def history(request):
     if not typed:
         return render(request, 'history.html', {})
 
-    ticker_value = resolve_symbol(typed)
+    ticker_value = DIRECTORY.resolve(typed)
     if ticker_value is None:
         return render(request, 'history.html', {
             'ticker_value': typed,
             'not_found': "{} is not one of the supported {}.".format(typed, SUPPORTED),
         })
 
-    df, exchange = dataset.load_history(ticker_value, OLD_SYMBOLS.get(ticker_value, ()))
+    df, exchange = dataset.load_history(ticker_value, DIRECTORY.old_symbols(ticker_value))
     if df is None or df.empty:
         return render(request, 'history.html', {
             'ticker_value': ticker_value,
             'not_found': "{} is not in the historical datasets.".format(ticker_value),
         })
-    cur = currency_of(ticker_value)
+    cur = DIRECTORY.currency(ticker_value)
 
     fig = go.Figure(go.Scatter(x=df.index, y=df['Adj Close'], name=ticker_value, line=dict(color=HIGHLIGHT)))
-    fig.update_layout(title='{} daily adjusted close'.format(listing(ticker_value)[0]),
+    fig.update_layout(title='{} daily adjusted close'.format(DIRECTORY.listing(ticker_value)[0]),
                       yaxis_title='Stock Price ({} per Share)'.format('INR' if cur == '₹' else 'USD'))
     fig.update_xaxes(
         rangeslider_visible=True,
@@ -338,8 +292,8 @@ def history(request):
     return render(request, 'history.html', {
         'ticker_value': ticker_value,
         'plot_div': plot_div,
-        'listed': listing(ticker_value)[0],
-        'info': {'Name': COMPANIES.loc[ticker_value, 'Name'], 'Exchange': listing(ticker_value)[1],
+        'listed': DIRECTORY.listing(ticker_value)[0],
+        'info': {'Name': DIRECTORY.name(ticker_value), 'Exchange': DIRECTORY.listing(ticker_value)[1],
                  'Source': dataset.SOURCES[exchange]},
         'stats': stats,
     })
@@ -353,7 +307,7 @@ def predict(request, ticker_value, number_of_days):
 
 def company_forecast(request, ticker_value):
     """Forecast section of the company page (loaded separately, since training the models takes a while)."""
-    symbol = resolve_symbol(ticker_value)
+    symbol = DIRECTORY.resolve(ticker_value)
     if symbol is None:
         return HttpResponse('')
     try:
@@ -368,8 +322,8 @@ def company_forecast(request, ticker_value):
 
 
 def _forecast(request, symbol, number_of_days):
-    listed = listing(symbol)[0]
-    cur = currency_of(symbol)
+    listed = DIRECTORY.listing(symbol)[0]
+    cur = DIRECTORY.currency(symbol)
     price_label = 'Stock Price ({} per Share)'.format('INR' if cur == '₹' else 'USD')
 
     # Most recent trading session at 1-minute resolution. Thinly traded tickers can have no
@@ -488,7 +442,7 @@ def _amount(value, symbol):
 
 
 def _key_ratio(kind, value, symbol):
-    cur = currency_of(symbol)
+    cur = DIRECTORY.currency(symbol)
     if value is None or (not isinstance(value, tuple) and pd.isna(value)):
         return '-'
     if kind == 'money':
@@ -564,7 +518,7 @@ def _price_chart(prices, listed):
 def company_search(request):
     """/company/?q=... opens that company; plain /company/ goes to the search dashboard."""
     typed = request.GET.get('q', '').strip()
-    symbol = resolve_symbol(typed) if typed else None
+    symbol = DIRECTORY.resolve(typed) if typed else None
     if symbol is None:
         return redirect('/' + ('?q=' + quote(typed) if typed else ''))
     return redirect('/company/{}/'.format(quote(symbol)))
@@ -574,7 +528,7 @@ def company(request, ticker_value):
     from . import analysis
     days = request.GET.get('days', '30')
     days = int(days) if days.isdigit() and 1 <= int(days) <= 365 else 30
-    symbol = resolve_symbol(ticker_value)
+    symbol = DIRECTORY.resolve(ticker_value)
     if symbol is None:
         typed = ticker_value.upper()
         if not TICKER_PATTERN.match(typed):
@@ -594,10 +548,10 @@ def company(request, ticker_value):
     except Exception:
         data = None
     if not data or (data['pnl'].empty and data['prices'].empty):
-        return error(request, "we could not find financial data for {} on Yahoo Finance.".format(listing(symbol)[0]))
+        return error(request, "we could not find financial data for {} on Yahoo Finance.".format(DIRECTORY.listing(symbol)[0]))
 
-    listed, exchange = listing(symbol)
-    row = COMPANIES.loc[symbol]
+    listed, exchange = DIRECTORY.listing(symbol)
+    row = DIRECTORY.row(symbol)
     info = data['info']
     change = None
     if data['price'] and data['previous_close']:
@@ -620,7 +574,7 @@ def company(request, ticker_value):
         'symbol': symbol, 'listed': listed, 'exchange': exchange,
         'days': days, 'horizons': PREDICT_HORIZONS,
         'name': row['Name'] if exchange == 'BSE' and not info.get('longName') else (info.get('longName') or row['Name']),
-        'price': '{} {:,.2f}'.format(currency_of(symbol), data['price']) if data['price'] else '-',
+        'price': '{} {:,.2f}'.format(DIRECTORY.currency(symbol), data['price']) if data['price'] else '-',
         'change': change,
         'price_date': data['prices'].index[-1].strftime('%d %b') if not data['prices'].empty else '',
         'links': links,
@@ -644,13 +598,13 @@ def company(request, ticker_value):
 def company_peers(request, ticker_value):
     """Peer comparison table (loaded separately by the company page, since it needs data for many companies)."""
     from . import analysis
-    symbol = resolve_symbol(ticker_value)
+    symbol = DIRECTORY.resolve(ticker_value)
     if symbol is None:
         return HttpResponse('')
-    industry = COMPANIES.loc[symbol, 'Industry']
-    if not industry:
+    industry = DIRECTORY.industry(symbol)
+    group = DIRECTORY.same_industry(symbol)
+    if not group:
         return render(request, 'company_peers.html', {'unavailable': True})
-    group = COMPANIES.index[(COMPANIES['Industry'] == industry) & (COMPANIES['Country'] == COMPANIES.loc[symbol, 'Country'])]
     candidates = [symbol] + [s for s in group if s != symbol][:59]
     try:
         metrics = analysis.peer_metrics(candidates)
@@ -673,7 +627,7 @@ def company_peers(request, ticker_value):
             '{:.2f}'.format(m['price_to_book']) if m['price_to_book'] else '-',
         ] + [movement(m['year_change'] * 100, '{:.1f}%') if m['year_change'] is not None else ('-', '')]
 
-    rows = [{'symbol': s, 'listed': listing(s)[0], 'name': COMPANIES.loc[s, 'Name'], 'cells': cells(metrics[s]), 'self': s == symbol}
+    rows = [{'symbol': s, 'listed': DIRECTORY.listing(s)[0], 'name': DIRECTORY.name(s), 'cells': cells(metrics[s]), 'self': s == symbol}
             for s in [symbol] + peers if metrics.get(s)]
     values = pd.DataFrame([metrics[s] for s in [symbol] + peers if metrics.get(s)])
     median = [
@@ -685,42 +639,16 @@ def company_peers(request, ticker_value):
     ] + [movement(values['year_change'].median() * 100, '{:.1f}%') if values['year_change'].notna().any() else ('-', '')]
     return render(request, 'company_peers.html', {
         'rows': rows, 'median': median, 'industry': industry, 'count': len(rows),
-        'currency': currency_of(symbol),
+        'currency': DIRECTORY.currency(symbol),
     })
 
 
 # ========================================== Search suggestions ==========================================
 
-_SEARCH_INDEX = pd.DataFrame({
-    'symbol': COMPANIES.index,
-    'listed': COMPANIES['Listed'].str.upper().values,
-    'name': COMPANIES['Name'].str.lower().values,
-    'exchange_rank': COMPANIES['Exchange'].map({'NSE': 0, 'US': 1, 'BSE': 2}).values,
-    # NIFTY 500 / S&P 500 members have an industry: list these better-known companies first
-    'minor': (COMPANIES['Industry'] == '').values,
-})
-
-
 def company_suggest(request):
     """Companies matching what the user has typed, best matches first (used by the search boxes)."""
     from django.http import JsonResponse
-    q = request.GET.get('q', '').strip()
-    if not q:
-        return JsonResponse({'results': []})
-    upper, lower = q.upper(), q.lower()
-    idx = _SEARCH_INDEX
-    rank = pd.Series(99, index=idx.index)
-    rank[idx['name'].str.contains(lower, regex=False)] = 4
-    rank[idx['listed'].str.contains(upper, regex=False)] = 3
-    rank[idx['name'].str.startswith(lower)] = 2
-    rank[idx['listed'].str.startswith(upper)] = 1
-    rank[idx['listed'] == upper] = 0
-    hits = idx.assign(rank=rank)[rank < 99].sort_values(['rank', 'minor', 'exchange_rank', 'listed']).head(8)
-    results = []
-    for symbol in hits['symbol']:
-        listed, exchange = listing(symbol)
-        results.append({'symbol': symbol, 'listed': listed, 'name': COMPANIES.loc[symbol, 'Name'], 'exchange': exchange})
-    return JsonResponse({'results': results})
+    return JsonResponse({'results': DIRECTORY.suggest(request.GET.get('q', ''))})
 
 
 # ========================================== Accounts ==========================================

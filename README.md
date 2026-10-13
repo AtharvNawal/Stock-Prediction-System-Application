@@ -3,6 +3,8 @@
   You can find the project here: https://github.com/Kumar-laxmi/Stock-Prediction-System-Application
 )
 
+[![CI](https://github.com/AtharvNawal/Stock-Prediction-System-Application/actions/workflows/ci.yml/badge.svg)](https://github.com/AtharvNawal/Stock-Prediction-System-Application/actions/workflows/ci.yml)
+
 ## Introduction
 <p>
   Predicting stock prices is a cumbersome task as it does not follow any specific pattern. Changes in the stock prices are purely based on supply and demand during a period of time. In order to learn the specific characteristics of a stock price, we can use algorithm to identify these patterns through machine learning. One of the most well-known networks for series forecasting is LSTM (long short-term memory) which is a Recurrent Neural Network (RNN) that is able to remember information over a long period of time, thus making them extremely useful for predicting stock prices. RNNs are well-suited to time series data and they are able to process the data step-by-step, maintaining an internal state where they cache the information they have seen so far in a summarised version. The successful prediction of a stock's future price could yield a significant profit.
@@ -32,11 +34,12 @@
 - #### FrameWork:
   - ![BOOTSTRAP](https://img.shields.io/badge/Bootstrap-563D7C?style=for-the-badge&logo=bootstrap&logoColor=white)
   - ![DJANGO](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=green)
+  - ![PYTORCH](https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)
 
 - #### Deployment:
   - Click to see deployement (NOTE: Deployement not working): <a href="https://stock-prediction-system.herokuapp.com/">![Heroku](https://img.shields.io/badge/Heroku-430098?style=for-the-badge&logo=heroku&logoColor=white)</a>
 - #### Machine-Learning Algorithms:
-  - <a href="https://en.wikipedia.org/wiki/Linear_regression">**MULTIPLE LINEAR REGRESSION**</a>
+  - **CNN + BiLSTM + Attention**, **1D CNN**, **Transformer encoder**, **Ridge regression**, and an inverse-error **weighted ensemble**, compared against a naive baseline
 
 - #### ML/DL:
   - ![NumPy](https://img.shields.io/badge/numpy-%23013243.svg?style=for-the-badge&logo=numpy&logoColor=white)
@@ -61,82 +64,71 @@
   - ![Figma](https://img.shields.io/badge/Figma-F24E1E?style=for-the-badge&logo=figma&logoColor=white)
 
 ## Prerequisites:
-```bash
-  Django==3.2.6
-  django-heroku==0.3.1
-  gunicorn==20.1.0
-  matplotlib==3.5.2
-  matplotlib-inline==0.1.3
-  numpy==1.23.0
-  pandas==1.4.1
-  pipenv==2022.6.7
-  plotly==5.9.0
-  requests==2.28.1
-  scikit-learn==1.1.1
-  scipy==1.8.1
-  seaborn==0.11.2
-  sklearn==0.0
-  virtualenv==20.14.1
-  virtualenv-clone==0.5.7
-  yfinance==0.1.72
-```
+Python 3.11. All dependencies are pinned in `requirements.txt` (app) and `requirements-dev.txt` (lint, coverage and security tools).
 
 ## Project Installation:
 **STEP 1:** Clone the repository from GitHub.
 ```bash
-  git clone https://github.com/Kumar-laxmi/Stock-Prediction-System-Application.git
-```
-
-**STEP 2:** Change the directory to the repository.
-```bash
+  git clone https://github.com/AtharvNawal/Stock-Prediction-System-Application.git
   cd Stock-Prediction-System-Application
 ```
 
-**STEP 3:** Create a virtual environment
-(For Windows)
+**STEP 2:** Create and activate a virtual environment.
 ```bash
-  python -m venv virtualenv
-```
-(For MacOS and Linux)
-```bash
-  python3 -m venv virtualenv
+  python3 -m venv .venv
+  source .venv/bin/activate        # Windows: .venv\Scripts\activate
 ```
 
-**STEP 4:** Activate the virtual environment.
-(For Windows)
+**STEP 3:** Install the dependencies (CPU-only torch keeps the download small).
 ```bash
-  virtualenv\Scripts\activate
-```
-(For MacOS and Linux)
-```bash
-  source virtualenv/bin/activate
+  pip install --extra-index-url https://download.pytorch.org/whl/cpu -r requirements-dev.txt
 ```
 
-**STEP 5:** Install the dependencies.
+**STEP 4:** Configure the environment. Settings come from environment variables (see `.env.example`); debug mode is off unless you turn it on.
 ```bash
-  pip install -r requirements.txt
+  export DJANGO_DEBUG=1            # Windows PowerShell: $env:DJANGO_DEBUG="1"
+  export SQLITE_PATH=./db.sqlite3
 ```
 
-**STEP 6:** Migrate the Django project.
-(For Windows)
+**STEP 5:** Migrate and run.
 ```bash
   python manage.py migrate
-```
-(For MacOS and Linux)
-```bash
-  python3 manage.py migrate
-```
-
-**STEP 7:** Run the application.
-(For Windows)
-```bash
   python manage.py runserver
 ```
-(For MacOS and Linux)
+
+**STEP 6:** Run the checks CI runs.
 ```bash
-  python3 manage.py runserver
+  ruff check .
+  bandit -c pyproject.toml -r app core scripts -ll
+  coverage run manage.py test app && coverage report
 ```
 
+## CI/CD Pipeline
+GitHub Actions runs two workflows (`.github/workflows/`):
+
+| Workflow | Trigger | Jobs |
+| --- | --- | --- |
+| **CI** (`ci.yml`) | every push and pull request | **Lint** (ruff) -> **Tests** (migration check, `check --deploy`, 52 tests with coverage); **Security scan** (Bandit, pip-audit) in parallel; then **Docker build** |
+| **CD** (`cd.yml`) | CI passed on `main` | **Publish** the image to `ghcr.io/<owner>/<repo>` tagged with the commit SHA and `latest` -> **Deploy** via `DEPLOY_HOOK_URL` (optional approval gate on the `production` environment) |
+
+Dependabot (`.github/dependabot.yml`) opens weekly update PRs for pip packages, GitHub Actions and the Docker base image; each goes through CI.
+
+To enable deployment, add a `DEPLOY_HOOK_URL` repository secret (for example a Render or Railway deploy hook), and set `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS` and `RATE_LIMIT_TRUSTED_PROXIES=1` on the host. Heroku can still use the `Procfile`, which runs migrations in its release phase.
+
+## Security
+- **Rate limiting with the token bucket algorithm** (`app/security.py`): per client and policy, e.g. 5 login attempts a minute (brute-force protection) and 6 forecasts a minute (each trains four neural networks). Over the limit returns `429` with `Retry-After`. `X-Forwarded-For` is only trusted for the configured number of proxies, so clients can't spoof their way past the limit.
+- **Argon2id password hashing**: memory-hard, so offline guessing is far more expensive than with PBKDF2. Existing PBKDF2 hashes upgrade on next login. Minimum password length is 10.
+- **No secrets in code**: `SECRET_KEY` is read from the environment and the app refuses to start without it when debug is off.
+- **Production hardening** when `DEBUG` is off: HTTPS redirect, HSTS, secure and HttpOnly cookies, `X-Frame-Options: DENY`, `nosniff`, a strict referrer policy; `manage.py check --deploy` passes with no warnings.
+- **Supply chain**: Django upgraded to 5.2 LTS (4.2 had 9 known CVEs), pip-audit and Bandit in CI, Dependabot updates, and the container runs as a non-root user.
+
+## Code Structure (OOP)
+| Module | Classes and patterns |
+| --- | --- |
+| `app/forecasting.py` | `Forecaster` abstract base with a template method (`train`/`predict`); `NeuralForecaster`, `RidgeForecaster`, `NaiveForecaster` subclasses (polymorphism); `WeightedEnsemble` (composite); `StandardScaler`/`TargetScaler` fit on training data only; `ForecastPipeline`; `ForecastService` with an injected cache and data source |
+| `app/caching.py` | `Cache` interface; `LRUCache` and `TTLCache` (inheritance), thread-safe |
+| `app/companies.py` | `CompanyDirectory` encapsulates the company list: symbol resolution, listings, peers, ranked search; `Listing` named tuple |
+| `app/security.py` | `TokenBucket`, `RatePolicy`, `RateLimiter`, `RateLimitMiddleware` |
 
 ## Output Screen-shots:
 The Home page: search any NSE, BSE or US company (with live suggestions), pick a forecast horizon from 7 days to 1 year, or start from a popular company.

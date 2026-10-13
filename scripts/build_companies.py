@@ -15,6 +15,7 @@ Run from the project root:  .venv/bin/python scripts/build_companies.py
 import io
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -36,7 +37,10 @@ NASDAQ100 = 'https://en.wikipedia.org/wiki/List_of_NASDAQ-100_companies'
 
 
 def fetch(url):
-    return urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=60).read().decode()
+    # urlopen also accepts file:// and other schemes; only ever fetch the exchanges' HTTPS URLs
+    if urllib.parse.urlsplit(url).scheme != 'https':
+        raise ValueError('refusing to fetch non-HTTPS URL: {}'.format(url))
+    return urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=60).read().decode()  # nosec B310
 
 
 def is_equity_share(isin):
