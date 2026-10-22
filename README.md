@@ -131,17 +131,19 @@ To enable deployment, add a `DEPLOY_HOOK_URL` repository secret (for example a R
 | `app/security.py` | `TokenBucket`, `RatePolicy`, `RateLimiter`, `RateLimitMiddleware` |
 
 ## Output Screen-shots:
+Click any screenshot to open the live app: **[investiq-nyay.onrender.com](https://investiq-nyay.onrender.com/)**
+
 The Home page: search any NSE, BSE or US company (with live suggestions), pick a forecast horizon from 7 days to 1 year, or start from a popular company.
-![InvestIQ home page with company search, forecast horizon and quick picks](docs/screenshots/home.png)
+[![InvestIQ home page with company search, forecast horizon and quick picks](docs/screenshots/home.png)](https://investiq-nyay.onrender.com/)
 
 The Market Overview page shows the main indices (NIFTY 50, SENSEX, NIFTY Bank, S&P 500, NASDAQ, USD/INR) with today's change and a one-month trend, the % return of top NSE stocks, and today's NIFTY 50 gainers, losers and most active stocks.
-![Market Overview page with index tiles, return chart and NIFTY 50 movers](docs/screenshots/market-overview.png)
+[![Market Overview page with index tiles, return chart and NIFTY 50 movers](docs/screenshots/market-overview.png)](https://investiq-nyay.onrender.com/)
 
 The Ticker Info page lists all 5,971 supported companies with their exact NSE/BSE symbols, searchable by symbol or name. Each symbol opens that company's AI forecast and analysis.
-![Ticker Info page listing all supported companies](docs/screenshots/ticker-info.png)
+[![Ticker Info page listing all supported companies](docs/screenshots/ticker-info.png)](https://investiq-nyay.onrender.com/)
 
 Users can create a free account and log in.
-![Login page](docs/screenshots/login.png)
+[![Login page](docs/screenshots/login.png)](https://investiq-nyay.onrender.com/)
 
 
 
