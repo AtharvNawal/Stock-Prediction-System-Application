@@ -1,5 +1,5 @@
 -r requirements.txt
-ruff==0.11.0       # lint
+ruff==0.17.2       # lint
 coverage==7.16.2   # test coverage
 bandit==1.9.4      # static security analysis
 pip-audit==2.10.1  # known vulnerabilities in dependencies
